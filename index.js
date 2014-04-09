@@ -4,6 +4,7 @@ var inserted;
 
 module.exports = function(container, options) {
 
+    options = options || {};
     if(options.insertCss !== false && !inserted){
         insertCss(fs.readFileSync(__dirname + "/css/style.css"));
         inserted = true;
