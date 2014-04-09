@@ -1,6 +1,6 @@
 {
   "name": "pageslide",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Browserify friendly version of coenraets PageSlider",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "http://github.com/cellvia/page-slide.git"
+    "url": "http://github.com/cellvia/pageslide.git"
   },
   "keywords": [
     "browserify",
@@ -19,7 +19,7 @@
   "license": "Apache2",
   "readmeFilename": "readme.md",
   "bugs": {
-    "url": "https://github.com/cellvia/page-slide/issues"
+    "url": "https://github.com/cellvia/pageslide/issues"
   },
   "dependencies": {
     "insert-css": "^0.1.1",
