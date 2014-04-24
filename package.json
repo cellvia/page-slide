@@ -1,6 +1,6 @@
 {
   "name": "pageslide",
-  "version": "0.2.1",
+  "version": "0.2.0",
   "description": "Browserify friendly version of coenraets PageSlider",
   "main": "index.js",
   "scripts": {
@@ -13,9 +13,12 @@
   "keywords": [
     "browserify",
     "pageslider",
+    "pageslide",
     "mobile"
   ],
-  "author": "@coenraets",
+  "author": {
+    "name": "@coenraets"
+  },
   "license": "Apache2",
   "readmeFilename": "readme.md",
   "bugs": {
@@ -26,6 +29,8 @@
     "brfs": "^1.0.1"
   },
   "browserify": {
-    "transform": [ "brfs" ]
+    "transform": [
+      "brfs"
+    ]
   }
 }

@@ -1,31 +1,69 @@
 var insertCss = require('insert-css');
 var fs = require('fs');
-var inserted;
 
-module.exports = function(container, options) {
+var isOpera = !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
+    // Opera 8.0+ (UA detection to detect Blink/v8-powered Opera)
+var isFirefox = typeof InstallTrigger !== 'undefined';   // Firefox 1.0+
+var isSafari = Object.prototype.toString.call(window.HTMLElement).indexOf('Constructor') > 0;
+    // At least Safari 3+: "[object HTMLElementConstructor]"
+var isChrome = !!window.chrome && !isOpera;              // Chrome 1+
+var isIE = /*@cc_on!@*/false || !!document.documentMode; // At least IE6
 
+module.exports = function(container, options){
     options = options || {};
-    if(options.insertCss !== false && !inserted){
+    if(options.insertCss !== false)
         insertCss(fs.readFileSync(__dirname + "/css/style.css"));
-        inserted = true;
-    } 
+
+    var pageslider = new PageSlide(container, options);
+
+    var returnObj = options.defaultMethod === 'slidePageFrom' ? pageslider.slidePageFrom.bind(pageslider) : pageslider.slidePage.bind(pageslider);
+    returnObj.slidePage = pageslider.slidePage.bind(pageslider);
+    returnObj.slidePageFrom = pageslider.slidePageFrom.bind(pageslider);
+    return returnObj;
+}
+
+function PageSlide(container, options) {
 
     var container = container,
         isJ = container instanceof jQuery,
         currentPage,
-        stateHistory = [];
+        stateHistory = [],
+        lastLevel,
+        allowPush = !options.useHash && testPushstate(),
+        tranType;
+
+    if(isSafari || isChrome)
+        tranType ='webkitTransitionEnd'
+    else if(isFirefox || isIE)
+        tranType = 'transitionend'
+    else if(isOpera)
+        tranType = 'otransitionend';
 
     // Use this function if you want PageSlider to automatically determine the sliding direction based on the state history
-    this.slidePage = function(page) {
+    this.slidePage = function(page, opts) {
+        opts = opts || {};
+        var state = allowPush ? window.location.pathname : window.location.hash;
 
-        var l = stateHistory.length,
-            state = window.history && history.pushState ? window.location.pathname : window.location.hash;
-
-        if (l === 0) {
-            stateHistory.push(state);
-            this.slidePageFrom(page);
+        if( opts.hasOwnProperty('level') ){
+            var level = +opts.level;
+            if(typeof lastLevel === "undefined")
+                this.slidePageFrom(page, undefined);
+            else
+                this.slidePageFrom(page, level >= lastLevel ? 'right' : 'left' );
+            lastLevel = level;
             return;
         }
+
+        var l = stateHistory.length;
+
+        if(opts.reset){
+            stateHistory = [state];
+            return this.slidePageFrom(page, 'left');
+        }else if (l === 0) {
+            stateHistory.push(state);
+            return this.slidePageFrom(page);
+        }
+
         if (state === stateHistory[l-2]) {
             stateHistory.pop();
             this.slidePageFrom(page, 'left');
@@ -38,8 +76,8 @@ module.exports = function(container, options) {
 
     // Use this function directly if you want to control the sliding direction outside PageSlider
     this.slidePageFrom = function(page, from) {
-
-        container[isJ ? "append" : appendChild](page);
+        var notFrom = from === "left" ? "right" : "left";
+            container[isJ ? "append" : "appendChild"](page);
 
         if (!currentPage || !from) {
             if(isJ){
@@ -53,7 +91,6 @@ module.exports = function(container, options) {
         }
 
         // Position the page at the starting position of the animation
-        var notFrom = from === "left" ? "right" : "left";
         if(isJ){
             page.removeClass(notFrom + " center transition").addClass("page " + from);
         }else{
@@ -61,32 +98,82 @@ module.exports = function(container, options) {
             page.classList.add("page", from);
         }
 
-        currentPage.one('webkitTransitionEnd', function(e) {
-            if(isJ){
-                $(e.target).remove();            
-            }else{
-                e.target.parentNode.removeChild(e.target);
-            }
-        });
+        if(isJ){
+            currentPage.one(tranType, function(e) {
+                page.trigger({ 
+                    type:'pageslideEnd', 
+                    slidFrom: from, 
+                    target: page[0],
+                    $target: page,
+                    fromTarget: currentPage[0],
+                    $fromTarget: currentPage,
+                    stopPropogation: function(){e.stopPropogation();} 
+                });
+                currentPage.trigger({ 
+                    type:'pageslideEnd', 
+                    slidFrom: from, 
+                    target: e.target, 
+                    $target: currentPage, 
+                    toTarget: page[0],
+                    $toTarget: page,
+                    stopPropogation: function(){e.stopPropogation();} 
+                });
+                if(!e.isPropagationStopped())
+                    $(e.target).remove();
+                currentPage = page;
+            });
+        }else{
+            var listener = function listener(e){
+                currentPage.removeEventListener( tranType, listener );
+                var event = new Event('pageslideEnd', { 
+                    type:'pageslideEnd', 
+                    slidFrom: from, 
+                    target: e.target 
+                });
+                e.target.dispatchEvent(event);
+                if(!event.isPropagationStopped())
+                    e.target.parentNode.removeChild(e.target);
+                currentPage = page;
+            };
+            currentPage.addEventListener( tranType, listener );
+        }
 
         // Force reflow. More information here: http://www.phpied.com/rendering-repaint-reflowrelayout-restyle/
         container[0].offsetWidth;
 
         // Position the new page and the current page at the ending position of their animation with a transition class indicating the duration of the animation
-        if(isJ){
-            page.removeClass("left right");
-            page.addClass("page transition center");
-            currentPage.removeClass("center " + (from === "left" ? "left" : "right"));
-            currentPage.addClass("page transition " + (from === "left" ? "right" : "left"));
-        }else{
-            page.classList.remove("right", "left");
-            page.classList.add("page", "transition", "center");
-            currentPage.classList.remove("center", from === "left" ? "left" : "right");
-            currentPage.classList.add("page", "transition", from === "left" ? "right" : "left");
-        }
-        currentPage = page;
+        var p = isJ ? page[0].classList : page.classList;
+        var cP = isJ ? currentPage[0].classList : currentPage.classList;
+
+        p.remove("left", "right");
+        cP.remove("center", from)
+
+        p.add("page","transition","center");
+        cP.add("page","transition",notFrom);
+        
     };
 
+}
+
+//taken from https://github.com/hay/Modernizr/commit/479e424faabe92062292699102340346c82335b8
+function testPushstate(){    
+    var ua = navigator.userAgent;
+    var properCheck = !!(window.history && history.pushState);
+    if (ua.indexOf("Android") === -1) {
+        // No Android, simply return the 'proper' check
+        return properCheck;
+    } else {
+        // We need to check for the stock browser (which identifies itself
+        // as 'Mobile Safari'), however, Chrome on Android gives the same
+        // identifier (and does support history properly), so check for that too
+        if (ua.indexOf("Mobile Safari") !== -1 && ua.indexOf("Chrome") === -1) {
+            // Buggy implementation, always return false
+            return false;
+        } else {
+            // Chrome, return the proper check
+            return properCheck;
+        }
+    }
 }
 
 /*
