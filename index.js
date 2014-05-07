@@ -1,5 +1,9 @@
-var insertCss = require('insert-css');
-var fs = require('fs');
+var insertCss, fs;
+
+if(process && process.browser){
+    insertCss = require('insert-css');
+    fs = require('fs');
+}
 
 var isOpera = !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
     // Opera 8.0+ (UA detection to detect Blink/v8-powered Opera)
@@ -11,7 +15,7 @@ var isIE = /*@cc_on!@*/false || !!document.documentMode; // At least IE6
 
 module.exports = function(container, options){
     options = options || {};
-    if(options.insertCss !== false)
+    if(process && process.browser && options.insertCss !== false)
         insertCss(fs.readFileSync(__dirname + "/css/style.css"));
 
     var pageslider = new PageSlide(container, options);
@@ -33,11 +37,13 @@ function PageSlide(container, options) {
         tranType;
 
     if(isSafari || isChrome)
-        tranType ='webkitTransitionEnd'
+        tranType ='webkitTransitionEnd';
     else if(isFirefox || isIE)
-        tranType = 'transitionend'
+        tranType = 'transitionend';
     else if(isOpera)
         tranType = 'otransitionend';
+    else
+        tranType ='webkitTransitionEnd';
 
     // Use this function if you want PageSlider to automatically determine the sliding direction based on the state history
     this.slidePage = function(page, opts) {
@@ -122,6 +128,8 @@ function PageSlide(container, options) {
                     $(e.target).remove();
                 currentPage = page;
             });
+            if(options.onEnd && typeof options.onEnd === "function")
+                currentPage.one(tranType, options.onEnd);                
         }else{
             var listener = function listener(e){
                 currentPage.removeEventListener( tranType, listener );
@@ -136,20 +144,27 @@ function PageSlide(container, options) {
                 currentPage = page;
             };
             currentPage.addEventListener( tranType, listener );
+            if(options.onEnd && typeof options.onEnd === "function")
+                currentPage.addEventListener( tranType, options.onEnd );
         }
 
         // Force reflow. More information here: http://www.phpied.com/rendering-repaint-reflowrelayout-restyle/
         container[0].offsetWidth;
 
         // Position the new page and the current page at the ending position of their animation with a transition class indicating the duration of the animation
-        var p = isJ ? page[0].classList : page.classList;
-        var cP = isJ ? currentPage[0].classList : currentPage.classList;
+        if(isJ){
+            page.removeClass("left right").addClass("page center transition");
+            currentPage.removeClass("center "+from).addClass("page transition "+ notFrom);
+        }else{
+            var p = page.classList;
+            var cP = currentPage.classList;
 
-        p.remove("left", "right");
-        cP.remove("center", from)
+            p.remove("left", "right");
+            cP.remove("center", from);
 
-        p.add("page","transition","center");
-        cP.add("page","transition",notFrom);
+            p.add("page","transition","center");
+            cP.add("page","transition",notFrom);            
+        }
         
     };
 

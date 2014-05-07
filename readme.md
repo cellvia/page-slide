@@ -6,6 +6,7 @@ This is a rework of https://github.com/brianleroux/page-slide
 
 Added:
 
+ * optionally feed in "level" integers to indicate the hierarchy.  if given level is greater than last level, page will slide from right 
  * cross-browser functionality via event normalization (pageslideEnd emitted on element)
  * native js AND jQuery compatibile
  * pushState detection, making hash optional
